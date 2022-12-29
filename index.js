@@ -1,9 +1,11 @@
+const fs = require('fs')
 class ProductManager {
     constructor() {
         this.products = []
+        this.path = './products/products.json'
     }
 
-    addProducts(title, description, price, thumbnail, code, stock) {
+    async addProducts(title, description, price, thumbnail, code, stock) {
         const product = {
             id: this.#generarId(),
             title,
@@ -13,18 +15,21 @@ class ProductManager {
             code,
             stock
         }
-
-        if (title && description && price && thumbnail && code && stock) {
-
-            const validCode = this.#validarCode(code)
-            if (validCode) {
-                console.warn('Código de producto repetido')
-            } else {
-                this.products.push(product)
+        try {
+            if (title && description && price && thumbnail && code && stock) {
+                const validCode = this.#validarCode(code)
+                if (validCode) {
+                    return 'Código de producto repetido'
+                } else {
+                    this.products.push(product)
+                    await fs.promises.writeFile(this.path, JSON.stringify(this.products))
+                }
             }
-        }
-        else {
-            return console.warn('Debe completar todos los campos')
+            else {
+                return 'Debe completar todos los campos'
+            }
+        } catch (error) {
+            throw new Error(error)
         }
     }
 
@@ -36,22 +41,106 @@ class ProductManager {
         return this.products.find(prod => prod.code === code)
     }
 
-    getProducts() {
-        return console.log(this.products)
+    async getProducts() {
+        try {
+            if (fs.existsSync(this.path)) {
+                const readProducts = await fs.promises.readFile(this.path, 'utf-8')
+                const productsParse = JSON.parse(readProducts)
+                return productsParse
+            } else {
+                return []
+            }
+        } catch (error) {
+            throw new Error(error)
+        }
     }
 
-    getProductById(id) {
-        const productFound = this.products.find(product => product.id === id)
-        productFound ? console.log(productFound) : console.warn('Not Found')
+    async getProductById(id) {
+
+        try {
+            const productsJSON = await fs.promises.readFile(this.path, 'utf-8')
+            const productsParse = await JSON.parse(productsJSON)
+            const productFound = await productsParse.find(product => product.id === id)
+            if (productFound) {
+                return productFound
+            }
+            else {
+                return 'Not Found'
+            }
+        } catch (error) {
+            throw new Error(error)
+        }
+    }
+
+    async updateProduct(id, change) {
+        try {
+            let arrayProducts = await fs.promises.readFile(this.path, 'utf-8')
+            arrayProducts = JSON.parse(arrayProducts)
+            let modifiedProduct = await this.getProductById(id)
+            if (modifiedProduct) {
+                modifiedProduct = { ...modifiedProduct, ...change }
+                arrayProducts = arrayProducts.map(product => {
+                    if (product.id === modifiedProduct.id) {
+                        product = modifiedProduct
+                    }
+                    return product
+                })
+                arrayProducts = JSON.stringify(arrayProducts)
+                await fs.promises.writeFile(this.path, arrayProducts)
+                return arrayProducts
+            } else {
+                return null
+            }
+        } catch (error) {
+            throw new Error(error)
+        }
+    }
+
+    async deleteProduct(id) {
+        try {
+            const productsJSON = await fs.promises.readFile(this.path, 'utf-8')
+            const productsParse = JSON.parse(productsJSON)
+            const deletedProduct = await this.getProductById(id)
+            if (deletedProduct) {
+                const newArray = productsParse.filter(prod => prod.id != id)
+                await fs.promises.writeFile(this.path, JSON.stringify(newArray))
+                return newArray
+            }
+        } catch (error) {
+            throw new Error(error)
+        }
     }
 }
 
 const newProduct = new ProductManager()
-newProduct.addProducts('Bicicleta Venzo Skyline', 'MTB, Aluminio, Rodado 29', '$116.000', 'https://www.google.com/aclk?sa=l&ai=DChcSEwiM_eKTtY38AhXVFdQBHSpND-AYABABGgJvYQ&sig=AOD64_2TDCySw_fwrVlrDynp0qrHv_hRsw&adurl&ctype=5&ved=2ahUKEwir5dSTtY38AhUUr5UCHeySDTYQvhd6BAgBEG4', 'MTB01', 10)
-newProduct.addProducts('Bicicleta Orbea Alma', 'MTB, Carbono, Rodado 29', '$1.600.000', 'https://www.google.com/aclk?sa=l&ai=DChcSEwiOxYXttY38AhUqKUwKHXwcCIsYABAPGgJvYQ&sig=AOD64_1TBtGTabWmZzmFrZO28-0oDON1EQ&adurl&ctype=5&ved=2ahUKEwib2vjstY38AhWxsJUCHfDDCNUQvhd6BAgBEHE', 'MTB02', 5)
-newProduct.addProducts('Bicicleta Profile Thomas', 'MTB, Carbono, Rodado 29', '$487.000', 'MTB03', 3)
-newProduct.addProducts('Bicicleta Venzo Phoenix', 'Ruta, Aluminio, Rodado 28', '$185.000', 'https://www.google.com/aclk?sa=l&ai=DChcSEwiQx_7dto38AhUHFdQBHSlYBZcYABABGgJvYQ&sig=AOD64_12PEW-NkhsjSvvnc45ValDXPHghg&adurl&ctype=5&ved=2ahUKEwjUq-7dto38AhVCOrkGHRySCQEQvhd6BAgBEG4', 'RUT01', 7)
-newProduct.addProducts('Bicicleta Specialized Tarmac', 'Ruta, Carbono, Rodado 28', '$1.068.000', 'https://d22fxaf9t8d39k.cloudfront.net/0a7201cafaa5e2066e7e77ee7c65ddca7c80a334442669d613bad11e195a389c70115.jpeg', 'RUT01', 3)
-newProduct.getProducts()
-newProduct.getProductById(5)
-newProduct.getProductById(1)
+const loadProducts = async () => {
+
+    //Carga de productos
+    await newProduct.addProducts('Bicicleta Venzo Skyline', 'MTB, Aluminio, Rodado 29', '$116.000', 'https://www.google.com/aclk?sa=l&ai=DChcSEwiM_eKTtY38AhXVFdQBHSpND-AYABABGgJvYQ&sig=AOD64_2TDCySw_fwrVlrDynp0qrHv_hRsw&adurl&ctype=5&ved=2ahUKEwir5dSTtY38AhUUr5UCHeySDTYQvhd6BAgBEG4', 'MTB01', 10)
+    await newProduct.addProducts('Bicicleta Orbea Alma', 'MTB, Carbono, Rodado 29', '$1.600.000', 'https://www.google.com/aclk?sa=l&ai=DChcSEwiOxYXttY38AhUqKUwKHXwcCIsYABAPGgJvYQ&sig=AOD64_1TBtGTabWmZzmFrZO28-0oDON1EQ&adurl&ctype=5&ved=2ahUKEwib2vjstY38AhWxsJUCHfDDCNUQvhd6BAgBEHE', 'MTB02', 5)
+    await newProduct.addProducts('Bicicleta Venzo Phoenix', 'Ruta, Aluminio, Rodado 28', '$185.000', 'https://www.google.com/aclk?sa=l&ai=DChcSEwiQx_7dto38AhUHFdQBHSlYBZcYABABGgJvYQ&sig=AOD64_12PEW-NkhsjSvvnc45ValDXPHghg&adurl&ctype=5&ved=2ahUKEwjUq-7dto38AhVCOrkGHRySCQEQvhd6BAgBEG4', 'RUT01', 7)
+
+    //No permite carga de productos con codigo repetido
+    // console.log(await newProduct.addProducts('Bicicleta Venzo Etna', 'Ruta, Carbono, Rodado 29', '$425.000', 'https://www.google.com/aclk?sa=l&ai=DChcSEwiQx_7dto38AhUHFdQBHSlYBZcYABABGgJvYQ&sig=AOD64_12PEW-NkhsjSvvnc45ValDXPHghg&adurl&ctype=5&ved=2ahUKEwjUq-7dto38AhVCOrkGHRySCQEQvhd6BAgBEG4', 'RUT01', 7))
+
+    //No permite carga de productos con datos incompletos
+    // console.log(await newProduct.addProducts('Bicicleta Venzo Raptor', 'Ruta, Aluminio, Rodado 29', '$195.000','RUT02', 7))
+
+    //Obtener todos los productos
+    console.log(await newProduct.getProducts())
+
+    //Obtener un producto por ID
+    // console.log(await newProduct.getProductById(2))
+    // console.log(await newProduct.getProductById(4))
+
+    // Modificar un producto ingresando ID y el campo a modificar
+    // console.log(JSON.parse(await newProduct.updateProduct(1, { 'price': '$128.000' })))
+    // console.log(JSON.parse(await newProduct.updateProduct(2, { 'stock': 2 })))
+
+    //Eliminar un productos por ID
+    // console.log(await newProduct.deleteProduct(3))
+}
+loadProducts()
+
+
+
